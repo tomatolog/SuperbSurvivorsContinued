@@ -432,39 +432,108 @@ function SuperSurvivor:setName(nameToSet)
 	self.player:getModData().NameRaw = nameToSet
 end
 
+--- Calculates the clamped screen position for off-screen indicators.
+---@param sx number
+---@param sy number
+---@param textW number
+---@param textH number
+---@return number, number
+local function getClampedPosition(sx, sy, textW, textH)
+	local screenW = getCore():getScreenWidth();
+	local screenH = getCore():getScreenHeight();
+	
+	-- Adjust these values to prevent text from going under UI elements
+	local marginSide = 20;
+	local marginTop = 50;    -- Adjust this if text goes under top UI
+	local marginBottom = 50; -- Adjust this if text goes under bottom UI
+
+	-- Define Safe Zone (where text CAN be drawn)
+	local minX = marginSide + textW / 2;
+	local maxX = screenW - marginSide - textW / 2;
+	local minY = marginTop;
+	local maxY = screenH - marginBottom - textH;
+
+	-- If inside safe zone, return original
+	if sx >= minX and sx <= maxX and sy >= minY and sy <= maxY then
+		return sx, sy;
+	end
+
+	local cx = screenW / 2;
+	local cy = screenH / 2;
+	local dx = sx - cx;
+	local dy = sy - cy;
+
+	-- Avoid divide by zero
+	if math.abs(dx) < 0.001 then dx = 0.001 end
+	if math.abs(dy) < 0.001 then dy = 0.001 end
+
+	local tMin = 1000000;
+
+	-- Check intersection with Safe Zone Rect
+	-- Right (maxX)
+	if dx > 0 then
+		local t = (maxX - cx) / dx;
+		if t < tMin then tMin = t end
+	else -- Left (minX)
+		local t = (minX - cx) / dx;
+		if t < tMin then tMin = t end
+	end
+
+	-- Bottom (maxY)
+	if dy > 0 then
+		local t = (maxY - cy) / dy;
+		if t < tMin then tMin = t end
+	else -- Top (minY)
+		local t = (minY - cy) / dy;
+		if t < tMin then tMin = t end
+	end
+
+	return cx + dx * tMin, cy + dy * tMin;
+end
+
 function SuperSurvivor:renderName() -- To do: Make an in game option to hide rendered names. It was requested.
 	CreateLogLine("SuperSurvivor", isLocalLoggingEnabled, "SuperSurvivor:renderName() called");
-	if (not self.userName)
-		or ((not self.JustSpoke)
-			and ((not self:isInCell())
-				or (self:Get():getAlpha() ~= 1.0)
-				or getSpecificPlayer(0) == nil
-				or (not getSpecificPlayer(0):CanSee(self.player))))
-	then
+	-- Basic safety checks only - removed visibility checks to allow off-screen rendering
+	if (not self.userName) or (getSpecificPlayer(0) == nil) then
 		return false
 	end
 
+	-- Calculate distance to player
+	local player = getSpecificPlayer(0);
+	local dist = GetDistanceBetween(player, self.player);
+	local distStr = string.format("  [%dm]", dist);
+
+	-- Build text content with distance
+	local textToDraw = "";
+	if (IsDisplayingNpcName) then
+		textToDraw = self.player:getForname() .. distStr;
+	else
+		textToDraw = distStr;
+	end
+
+	-- Handle speech display logic (speech on top, name+distance below)
 	if (self.JustSpoke == true) and (self.TicksSinceSpoke == 0) then
 		self.TicksSinceSpoke = 250
-
-		if (not IsDisplayingNpcName) then
-			self.userName:ReadString(tostring(self.SayLine1))
-		elseif (IsDisplayingNpcName) then
-			self.userName:ReadString(self.player:getForname() .. "\n" .. tostring(self.SayLine1))
+		if (self.SayLine1 and self.SayLine1 ~= "") then
+			textToDraw = tostring(self.SayLine1) .. "\n" .. textToDraw;
 		end
 	elseif (self.TicksSinceSpoke > 0) then
 		self.TicksSinceSpoke = self.TicksSinceSpoke - 1
 		if (self.TicksSinceSpoke == 0) then
-			if (not IsDisplayingNpcName) then
-				self.userName:ReadString("");
-			elseif (IsDisplayingNpcName) then
-				self.userName:ReadString(self.player:getForname());
-			end
 			self.JustSpoke = false
 			self.SayLine1 = ""
+		else
+			-- Update distance while speech is still showing
+			if (self.SayLine1 and self.SayLine1 ~= "") then
+				textToDraw = tostring(self.SayLine1) .. "\n" .. textToDraw;
+			end
 		end
 	end
 
+	-- Update text object with final content
+	self.userName:ReadString(textToDraw);
+
+	-- Calculate screen position
 	local sx = IsoUtils.XToScreen(self:Get():getX(), self:Get():getY(), self:Get():getZ(), 0);
 	local sy = IsoUtils.YToScreen(self:Get():getX(), self:Get():getY(), self:Get():getZ(), 0);
 	sx = sx - IsoCamera.getOffX() - self:Get():getOffsetX();
@@ -472,12 +541,18 @@ function SuperSurvivor:renderName() -- To do: Make an in game option to hide ren
 
 	sy = sy - 128
 
-	sx = sx / getCore():getZoom(0)
-	sy = sy / getCore():getZoom(0)
+	local zoom = getCore():getZoom(0);
+	sx = sx / zoom;
+	sy = sy / zoom;
 
-	sy = sy - self.userName:getHeight()
+	-- Get text dimensions after setting content
+	local textW = self.userName:getWidth();
+	local textH = self.userName:getHeight();
 
-	self.userName:AddBatchedDraw(sx, sy, true)
+	-- Apply clamped positioning to keep banner visible when NPC is off-screen
+	local clampedX, clampedY = getClampedPosition(sx, sy - textH, textW, textH);
+
+	self.userName:AddBatchedDraw(clampedX, clampedY, true)
 end
 
 function SuperSurvivor:setHostile(toValue) -- Moved up, to find easier
