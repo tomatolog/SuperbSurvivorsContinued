@@ -75,7 +75,11 @@ end
 function FarmingTask:getPlant(sq)
 	local plant
 	-- WIP - Cows: What is "basicFarming"? "basicFarming" is undefined...
-	plant = basicFarming.getCurrentPlanting(sq)
+	if basicFarming then
+		plant = basicFarming.getCurrentPlanting(sq)
+	else
+		plant = nil
+	end
 
 	if plant then
 		return plant
