@@ -4,3 +4,4 @@ mods/SuperbSurvivorsContinued/media/lua/client/.VSCodeCounter/*
 *.bak
 mods/SuperbSurvivorsContinued/[0-9]*
 SuperbSurvivorsContinued.code-workspace
+mods/SuperbSurvivorsContinued/media/lua/client/09_GOAP/*
