@@ -74,6 +74,32 @@ function logPretty(...)
     file:close();
 end
 
+local LogLevel = {
+    info  = 1,
+    debug = 2,
+    error = 3
+}
+
+local g_eLogLevel = LogLevel.info
+
+local function logWithLevel(level, ...)
+    if level <= g_eLogLevel then
+        logPretty(...)
+    end
+end
+
+function logInfo(...)
+    logWithLevel(LogLevel.info, ...)
+end
+
+function logDebug(...)
+    logWithLevel(LogLevel.debug, ...)
+end
+
+function logError(...)
+    logWithLevel(LogLevel.error, ...)
+end
+
 -- Example usage:
 -- CreateLogLine("SS_Debugger", true, "Start...");
 -- CreateLogPretty({name = "John", age = 30});
