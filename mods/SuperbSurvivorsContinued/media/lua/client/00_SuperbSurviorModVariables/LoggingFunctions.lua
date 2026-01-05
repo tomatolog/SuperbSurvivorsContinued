@@ -82,6 +82,15 @@ local LogLevel = {
 
 local g_eLogLevel = LogLevel.info
 
+function SetLogLevel(level)
+    if type(level) == "string" then
+        level = level:lower()
+        if LogLevel[level] then
+            g_eLogLevel = LogLevel[level]
+        end
+    end
+end
+
 local function logWithLevel(level, ...)
     if level <= g_eLogLevel then
         logPretty(...)
