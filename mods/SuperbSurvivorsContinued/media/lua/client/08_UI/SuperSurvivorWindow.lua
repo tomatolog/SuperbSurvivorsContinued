@@ -1,5 +1,6 @@
 require "04_Group.SuperSurvivorManager";
 require "07_UI/UIUtils";
+local goap_test = require("10_Plan/UI_test");
 
 local windowHeaderHeight = 30;
 local window_height = (30 * 10) + (windowHeaderHeight * 3) - 4; -- Cows: 30 * 3 to cover the window header, panel header, and the tabs buttons. -4 to remove empty space.
@@ -565,6 +566,7 @@ context_options.show_context_menu_order = function(member_index)
     context_menu:addOption("Relax", nil, function() UIUtil_GiveOrder(21, member_index) end)
     context_menu:addOption("Return To Base", nil, function() UIUtil_GiveOrder(22, member_index) end)
     context_menu:addOption("Pile Corpses", nil, function() UIUtil_GiveOrder(23, member_index) end)
+    context_menu:addOption("Planer test1", nil, function() goap_test.UI_test() end)
 end
 
 context_options.show_context_menu_role = function(member_index)
@@ -600,6 +602,7 @@ context_options.show_context_menu_role = function(member_index)
     sub_order:addOption("Relax", nil, function() UIUtil_GiveOrder(21, member_index) end)
     sub_order:addOption("Return To Base", nil, function() UIUtil_GiveOrder(22, member_index) end)
     sub_order:addOption("Pile Corpses", nil, function() UIUtil_GiveOrder(23, member_index) end)
+    sub_order:addOption("Planer test1", nil, function() goap_test.UI_test() end)
     context_menu:addSubMenu(order, sub_order)
     local remove = context_menu:addOption("Remove", nil, nil)
     local sub_remove = context_menu:getNew(context_menu)
