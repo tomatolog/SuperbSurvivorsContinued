@@ -1,5 +1,6 @@
 
 require "04_DataManagement/SuperSurvivorsMod" -- For logging and globals if needed
+require "00_SuperbSurviorModVariables/LoggingFunctions"
 
 GoapPlanExecutor = {}
 GoapPlanExecutor.__index = GoapPlanExecutor
@@ -63,7 +64,7 @@ function GoapPlanExecutor:update()
     if not self.planner then
         self:setupPlanner() -- Abstract method, must be implemented by subclass
         if not self.planner then
-            print("GoapPlanExecutor: No planner setup. Completing.")
+            logDebug("GoapPlanExecutor: No planner setup. Completing.")
             self.Complete = true
             return false
         end
@@ -71,15 +72,25 @@ function GoapPlanExecutor:update()
 
     if not self.currentPlan then
         self:updateWorldState() -- Sync planner state with game reality
-        print(self.Name .. ": Calculating plan...")
+        logDebug(self.Name .. ": Calculating plan...")
         self.currentPlan = self.planner:calculate()
         
-        if not self.currentPlan or #self.currentPlan == 0 then
-            print(self.Name .. ": No plan found. Task Failed.")
+        if self.currentPlan == nil then
+            logDebug(self.Name .. ": No plan found. Task Failed.")
+            logDebug("Start State:", self.planner.start_state)
+            logDebug("Goal State:", self.planner.goal_state)
             self.Complete = true
             return false
+        elseif #self.currentPlan == 0 then
+            logDebug(self.Name .. ": Goal already satisfied (Empty Plan).")
+            self.Complete = true
+            return true
         else
-            print(self.Name .. ": Plan found with " .. #self.currentPlan .. " steps.")
+            local planSteps = {}
+            for i, node in ipairs(self.currentPlan) do
+                table.insert(planSteps, i .. ": " .. node.name)
+            end
+            logDebug(self.Name .. ": Plan found: ", planSteps)
             self.currentStepIndex = 1
         end
     end
@@ -87,28 +98,30 @@ function GoapPlanExecutor:update()
     -- 2. Execute current step
     local planNode = self.currentPlan[self.currentStepIndex]
     if not planNode then
-        print(self.Name .. ": Plan finished successfully.")
+        logDebug(self.Name .. ": All plan steps completed.")
         self.Complete = true
         return true
     end
 
-    self.currentActionName = planNode.name
+    if self.currentActionName ~= planNode.name then
+        logDebug(self.Name .. ": Switching to Action [" .. self.currentStepIndex .. "/" .. #self.currentPlan .. "]: " .. planNode.name)
+        self.currentActionName = planNode.name
+    end
     
     -- Dispatch to specific handler
-    -- We match action names to function names. 
-    -- E.g. "findWindow1" matches handler "action_findWindow" (stripping numbers) or exact match
     local status = self:dispatchAction(self.currentActionName)
 
     -- 3. Handle Status
     if status == self.STATUS.SUCCESS then
-        -- print(self.Name .. ": Action '" .. self.currentActionName .. "' SUCCESS.")
+        logDebug(self.Name .. ": Action '" .. self.currentActionName .. "' returned SUCCESS.")
         self.currentStepIndex = self.currentStepIndex + 1
     elseif status == self.STATUS.FAILED then
-        print(self.Name .. ": Action '" .. self.currentActionName .. "' FAILED. Triggering re-plan.")
+        logDebug(self.Name .. ": Action '" .. self.currentActionName .. "' returned FAILED. Triggering re-plan.")
         self.currentPlan = nil -- Force re-plan
         self.Context = {} -- Optionally clear context
     elseif status == self.STATUS.RUNNING then
-        -- Continue next tick
+        -- Optional: uncomment for extremely verbose per-tick execution logs
+        -- logDebug(self.Name .. ": Action '" .. self.currentActionName .. "' is RUNNING...")
     end
 end
 
@@ -129,7 +142,7 @@ function GoapPlanExecutor:dispatchAction(actionName)
         end
     end
 
-    print("GoapPlanExecutor: No handler found for action: " .. actionName)
+    logDebug("GoapPlanExecutor: No handler found for action: " .. actionName)
     return self.STATUS.FAILED
 end
 

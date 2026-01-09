@@ -1,5 +1,6 @@
 
 require "10_Plan/GoapPlanExecutor"
+require "00_SuperbSurviorModVariables/LoggingFunctions"
 local goap = require("09_GOAP/01_init")
 local BarricadeTaskFactory = require("09_GOAP/tasks/barricade")
 
@@ -54,7 +55,7 @@ function BarricadePlan:updateWorldState()
         -- specific check for hammer/plank equipped
         local pValid = primary and (primary:hasTag("Hammer") or primary:getType() == "Hammer" or primary:getType() == "HammerStone")
         local sValid = secondary and (secondary:getType() == "Plank")
-        equipped = pValid and sValid
+        equipped = (pValid and sValid) and true or false
     end
     
     -- Set Start State
@@ -103,7 +104,7 @@ end
 function BarricadePlan:action_findWindow(n)
     local building = self.parent:getBuilding()
     if not building then
-        print("BarricadePlan: No building found.")
+        logDebug("BarricadePlan: No building found.")
         return self.STATUS.FAILED
     end
     
@@ -112,10 +113,10 @@ function BarricadePlan:action_findWindow(n)
     
     if window then
         self.Context.TargetWindow = window
-        print("BarricadePlan: Found window at " .. window:getX() .. "," .. window:getY())
+        logDebug("BarricadePlan: Found window at " .. window:getX() .. "," .. window:getY())
         return self.STATUS.SUCCESS
     else
-        print("BarricadePlan: No unbarricaded window found.")
+        logDebug("BarricadePlan: No unbarricaded window found.")
         return self.STATUS.FAILED
     end
 end
@@ -155,14 +156,27 @@ function BarricadePlan:action_barricadeWindow(n)
     local window = self.Context.TargetWindow
     if not window then return self.STATUS.FAILED end
     
-    -- If already barricaded, we are done
     local barricade = window:getBarricadeForCharacter(self.parent.player)
     if barricade and not barricade:canAddPlank() then
-        self.Context.TargetWindow = nil -- Clear target
+        -- Fully barricaded
+        self.Context.TargetWindow = nil 
         self.Context.WindowsDone = (self.Context.WindowsDone or 0) + 1
         return self.STATUS.SUCCESS
     end
-    
+
+    -- Check resources before starting new action
+    local inv = self.parent.player:getInventory()
+    local hasPlank = inv:containsType("Base.Plank")
+    local hasNails = inv:getItemCount("Base.Nails", true) >= 2
+    -- Reuse logic for hammer check if needed, or assume we have it if we are here (since equipTools passed)
+    -- But strict check is safer
+    local hasHammer = inv:containsTag("Hammer") or inv:containsType("Base.Hammer") or inv:containsType("Base.HammerStone")
+
+    if not (hasPlank and hasNails and hasHammer) then
+        logDebug("BarricadePlan: Out of resources during barricade loop.")
+        return self.STATUS.FAILED -- Trigger re-plan to get resources
+    end
+
     -- Check if we are currently performing the action
     if self.parent:isInAction() then
         return self.STATUS.RUNNING
@@ -170,29 +184,7 @@ function BarricadePlan:action_barricadeWindow(n)
     
     -- Start Action
     ISTimedActionQueue.add(ISBarricadeAction:new(self.parent.player, window, false, false, 100))
-    
-    -- We return RUNNING so that next update we check isInAction()
-    -- However, once the action is queued, isInAction might not be true immediately in the same tick?
-    -- Usually it's safer to return RUNNING and let the next tick catch the action progress.
-    -- But we need a way to detect "Action Just Finished". 
-    -- If we aren't in action, and we just added it, we assume it starts. 
-    -- If we aren't in action and we are here again, it means it finished? 
-    -- A simple check is: if the window state changed.
-    
-    -- Let's try: if we are NOT in action, we queue it. 
-    -- But we need to know if we already queued it.
-    -- A flag in Context?
-    
-    if not self.Context.ActionQueued then
-        self.Context.ActionQueued = true
-        return self.STATUS.RUNNING
-    else
-        -- We queued it previously. If we are not in action now, it means it finished (or failed start).
-        self.Context.ActionQueued = false -- Reset
-        self.Context.TargetWindow = nil -- Clear target
-        self.Context.WindowsDone = (self.Context.WindowsDone or 0) + 1
-        return self.STATUS.SUCCESS
-    end
+    return self.STATUS.RUNNING
 end
 
 return BarricadePlan
