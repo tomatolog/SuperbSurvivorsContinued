@@ -1,5 +1,6 @@
 local goap = require("09_GOAP/01_init")
-require "10_Plan/tasks/BarricadePlan"
+require "10_Plan/tasks/BarricadeTheWindowPlan"
+require "10_Plan/tasks/BarricadeAllPlan"
 require "04_Group.SuperSurvivorManager"
 
 local goap_test = {}
@@ -60,10 +61,10 @@ function goap_test.GiveBarricadeOrder(member_index)
     local member = group_members[member_index]
     
     if member then
-        getSpecificPlayer(0):Say("Ordering " .. member:getName() .. " to Barricade (GOAP)")
+        getSpecificPlayer(0):Say("Ordering " .. member:getName() .. " to Barricade All (GOAP)")
         
         -- Create the new plan task
-        local task = BarricadePlan:new(member)
+        local task = BarricadeAllPlan:new(member)
         
         -- Add to task manager
         member:getTaskManager():AddToTop(task)
