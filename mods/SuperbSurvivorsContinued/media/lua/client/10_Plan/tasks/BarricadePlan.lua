@@ -66,6 +66,21 @@ function BarricadePlan:updateWorldState()
     if self.Context.WindowsDone then
         currentWindows = self.windowsToBarricade - self.Context.WindowsDone
     end
+
+    -- Ground truth check: if we think we have windows left, but we can't find any in the building, set to 0
+    if currentWindows > 0 and not hasTarget then
+        local building = self.parent:getBuilding()
+        if building then
+            local nextWindow = self.parent:getUnBarricadedWindow(building)
+            if not nextWindow then
+                currentWindows = 0
+            end
+        else
+            -- If not in a building, we can't find windows to barricade
+            currentWindows = 0
+        end
+    end
+
     if currentWindows < 0 then currentWindows = 0 end
 
     self.planner:set_start_state({
